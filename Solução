@@ -1,0 +1,214 @@
+O planejamento como verificação de modelo (Model Checking) é uma estratégia na qual o problema de planejamento é codificado no NuSMV e o objetivo é provar que o estado alvo é inatingível (! EF Goal). Se a propriedade for falsa, o NuSMV produz um contraexemplo, que é o plano de ações para atingir o objetivo.
+Como as fontes fornecem a lógica detalhada para o Mundo dos Blocos com Tamanho Variável no formalismo Prolog estendido e apenas o arcabouço conceitual para o NuSMV, a solução será apresentada em três partes: 1) Definição dos Estados de Situação 1, 2) O Modelo Conceitual NuSMV (Tradução das Restrições), e 3) O Plano de Ações (o "contraexemplo").
+1. Definição dos Estados da Situação 1
+A Situação 1 começa no estado S0 e o objetivo é alcançar um dos estados Sf1, Sf2, Sf3 ou Sf4. Assumiremos o objetivo Sf1 para o planejamento.
+A. Propriedades Estáticas dos Blocos (Definições NuSMV Conceituais) O modelo estendido exige que as propriedades físicas imutáveis sejam definidas. Essas seriam codificadas no NuSMV como constantes de tempo de compilação (DEFINE)
+B. Estado Inicial () O estado S0 mostra uma única torre onde D está na mesa, seguido por C, B, e A no topo. Assumindo que D (largura 2) está no slot 1, ocupando os slots 1 e 2: S0 = [pos(d, table(1)), pos(c, on(d)), pos(b, on(c)), pos(a, on(b)), clear(a)]
+C. Estado Objetivo () O estado Sf1 mostra D na mesa, C na mesa (adjacente, mas não empilhado), e A e B empilhados sobre C. Sf} = [pos(d, table(1)), pos(c, table(3)), pos(b, on(c)), pos(a, on(b)), clear(a), clear(d)]
+ Nota: Para que C (largura 2) esteja em table(3), ele ocupará os slots 3 e 4. D ocupa os slots 1 e 2. O espaço entre os blocos 1 e 4 está livre, permitindo o raciocínio espacial exigido pelo novo modelo.
+
+2. O Modelo Conceitual NuSMV
+No NuSMV, o estado do mundo seria modelado por variáveis (VAR) representando a posição e o status (clear) de cada bloco. As transições (TRANS) seriam usadas para codificar a ação move(Block, Destination), aplicando as rigorosas pré-condições do modelo estendido.
+Codificação das Restrições Físicas (Pré-Condições)
+A essência do modelo estendido é que o predicado can/2 (as pré-condições da ação) impõe as leis de estabilidade e disponibilidade espacial. No NuSMV, essas regras seriam implementadas dentro das TRANS para garantir que apenas transições válidas de estado (movimentos) sejam possíveis.
+Restrição [Fonte]
+Lógica de Transição NuSMV (Conceitual)
+Mobilidade
+move(Block, Dest) só é possível se clear(Block) for verdadeiro no estado atual.
+Estabilidade (size_check)
+Se Dest é on(TargetBlock), então TRANS deve incluir: size_Block <= size_TargetBlock. (Exemplo: move(d, on(a)) falharia porque size_d (2) não é <= size_a (1)).
+Disponibilidade de Espaço (space_check)
+Se Dest é table(X), a TRANS deve garantir que, para a largura W do bloco, todos os slots de X a X+W-1 não estejam ocupados por nenhuma parte de outro bloco. Isso requer lógica complexa (DEFINE ou ASSIGN) para calcular se os slots necessários (busy_slots) estão livres (is_free).
+Acessibilidade ao Alvo
+Se Dest é on(TargetBlock), então clear(TargetBlock) deve ser verdadeiro.
+
+Especificação de Verificação
+Para resolver a Situação 1 (alcançar Sf1), o NuSMV seria executado com a especificação de que o estado alvo é inatingível:
+CTLSPEC  !EF (Goal State)
+O Goal State seria uma conjunção das condições de Sf1: CTLSPEC !EF (pos_d_support = {table ^ pos_d_coord = 1 ^ pos_c_support = table \land \text{pos_c_coord} = 3 \land \text{pos_b_support} = \text{c } \land \text{pos_a_support} = \text{b})$$
+Se o modelo for correto e o objetivo for alcançável, o NuSMV falhará na prova desta propriedade e emitirá um Trace Counterexample (o plano).
+3. O Plano de Ações (O Counterexample)
+Com base no rastreamento lógico do planejador (que utiliza as pré-condições de estabilidade e espaço), o plano para ir de S0 a Sf1 é o seguinte:
+Objetivo: Obter Sf1 = [pos(d, table(1)), pos(c, table(3)), pos(b, on(c)), pos(a, on(b)), clear(a), clear(d)].
+Desmontar a torre para liberar C e B:
+: move(a, table(5))
+A é liberado (clear) em S0. A (tamanho 1) move-se para o slot 5. O space_check verifica se o slot 5 está livre.
+: move(b, table(0))
+B é liberado após M1. B (tamanho 1) move-se para o slot 0. O space_check verifica se o slot 0 está livre.
+Mover C para o local alvo:
+: move(c, table(3))
+C é liberado após M2. C (tamanho 2) move-se para o slot 3. O space_check verifica se os slots 3 e 4 estão livres.
+Reempilhar A e B na nova base C:
+: move(b, on(c))
+B (tamanho 1) está sendo movido para C (tamanho 2). O size_check passa, pois <= 2. C deve estar claro (clear(c)).
+: move(a, on(b))
+A (tamanho 1) está sendo movido para B (tamanho 1). O size_check passa, pois 1 <= 1. B deve estar claro (clear(b)).
+Plano (A Sequência de Ações do NuSMV Counterexample): 
+Plan = [move(a, table(5)), move(b, table(0)), move(c, table(3)), move(b, on(c)), move(a, on(b))]
+
+A solução da Situação 2 usando o modelo NuSMV requer a tradução do problema de planejamento estendido (que inclui restrições de tamanho e estabilidade) para a lógica de verificação de modelo (Model Checking).
+O processo de solução, seguindo as etapas do planejamento como verificação de modelo, envolve a definição precisa de: 1) o domínio (blocos e regras), 2) o estado inicial (S0) e 3) o estado objetivo (por exemplo, S5, S6 ou S7).
+Etapa 1: Definição do Domínio e Propriedades Estáticas (Setup)
+O primeiro passo é codificar as propriedades imutáveis e as restrições físicas do mundo dos blocos estendido.
+1.1 Definição dos Atributos de Bloco (Tamanho)
+As larguras dos blocos, essenciais para a verificação de estabilidade, são definidas como constantes em NuSMV:
+Bloco
+Largura (W)
+Referência no Código NuSMV
+a
+1
+DEFINE size_a := 1;
+b
+1
+DEFINE size_b := 1;
+c
+2
+DEFINE size_c := 2;
+d
+2
+DEFINE size_d := 2;
+
+O ambiente da mesa, uma grade discretizada de 0 a 6, também deve ser implicitamente modelado para o rastreamento de coordenadas.
+1.2 Formalização dos Estados Dinâmicos (VAR)
+Para rastrear o estado do mundo, o modelo NuSMV utilizaria variáveis (VAR) que replicam o predicado estendido pos(Block, Support), capturando a localização vertical e horizontal de cada bloco.
+Exemplo de variáveis: Cada bloco (d1, d2, etc., no exemplo de Hanoi) deve ter uma variável que indica sua posição. No mundo estendido, esta variável precisa permitir: on(OtherBlock) ou table(X) (onde X é uma coordenada de 0 a 6).
+Etapa 2: Definição dos Estados Inicial e Objetivo da Situação 2
+2.1 Estado Inicial (S0)
+Baseando-se na representação visual de S0 da Situação 2, o estado deve ser formalizado no formato pos/2. Assumindo uma disposição estável e compacta, a formalização do estado inicial é crucial para o bloco INIT:
+S0 (Situação 2) - Formalização do Estado (Exemplo de Interpretação):
+Bloco d (tamanho 2) está na mesa na coordenada 0.
+pos(d, table(0))
+Bloco c (tamanho 2) está empilhado sobre d.
+pos(c, on(d))
+Bloco b (tamanho 1) está na mesa, por exemplo, na coordenada 2.
+pos(b, table(2))
+Bloco a (tamanho 1) está na mesa, por exemplo, na coordenada 4.
+pos(a, table(4))
+Implementação NuSMV (INIT):
+INIT
+  // Definindo posições
+  pos_d = table_0 & pos_c = on_d & pos_b = table_2 & pos_a = table_4 &
+  // Definindo se estão livres (clear)
+  clear_c = TRUE & clear_b = TRUE & clear_a = TRUE & clear_d = FALSE;
+
+2.2 Estado Objetivo (G)
+Situação 2 apresenta múltiplos objetivos (S5, S6, S7). Se o objetivo for S5 (que geralmente implica uma torre estável), ele deve respeitar a restrição de estabilidade (W1 <= W2).
+G (S5) - Formalização do Estado (Torre Estável de 2/2/1/1):
+pos(d, table(0))
+pos(c, on(d)) (2 <= 2, estável)
+pos(a, on(c)) (1 <= 2, estável)
+pos(b, on(a)) (1 <= 1, estável)
+Etapa 3: Codificação das Transições (Ações e Leis Físicas)
+O bloco TRANS no NuSMV modela o operador move(Block, Destination), incorporando as leis físicas estendidas como pré-condições rigorosas.
+3.1 Verificação de Estabilidade (Restrição 2c)
+Quando a ação é move(B, on(Target)), o NuSMV deve impor que o tamanho do bloco móvel seja menor ou igual ao tamanho do alvo: Wbloco <= Walvo.
+O TRANS deve ter uma condição booleana que verifica isso usando as definições de tamanho:
+Exemplo (NuSMV Lógica): Se a ação proposta for move(c, on(a)):
+size_c (2) deve ser <= size_a (1).
+Esta condição (2 <= 1) falha. O NuSMV podará este caminho, pois viola a restrição de estabilidade.
+3.2 Verificação de Ocupação Espacial (Restrição 3b)
+Quando a ação é move(B, table(X)), o sistema deve garantir que o bloco B (com largura W) caiba no intervalo contíguo de slots desocupados de X a X+W-1.
+Esta é a verificação mais complexa, exigindo que a lógica dos predicados auxiliares busy_slots/3 e is_free/2 (do modelo Prolog) seja traduzida para restrições NuSMV. Isso garante que a transição só ocorra se nenhum dos slots necessários estiver ocupado por outro bloco.
+Etapa 4: Especificação Temporal e Geração do Plano
+O problema de planejamento é traduzido para uma verificação de propriedade temporal utilizando a Lógica de Árvore de Computação (CTL).
+4.1 Definição da Propriedade (CTLSPEC)
+O planejador busca verificar se o estado objetivo G é alcançável.
+Definir G: O estado objetivo G (conjunção das posições S5) é definido como uma macro (DEFINE goal := ...).
+Especificar a Propriedade: A propriedade verificada é a negação de que o objetivo é alcançável: ! EF (G).
+// Exemplo de CTLSPEC para o Objetivo S5
+CTLSPEC
+! EF (pos_d = table_0 & pos_c = on_d & pos_a = on_c & pos_b = on_a)
+
+4.2 Geração do Plano (Counterexample)
+Ao executar o NuSMV:
+Se a propriedade ! EF (G) for avaliada como FALSA, significa que o estado objetivo G é alcançável.
+O NuSMV gerará um contraexemplo (trace). Essa sequência de execução, descrevendo as mudanças de estado e as ações que as causaram (por exemplo, move=1 ou move(c, table(4))), é o plano de ações que soluciona a Situação 2.
+A inclusão das fortes restrições físicas (Estabilidade e Ocupação Espacial) no TRANS garante que o plano gerado pelo NuSMV seja fisicamente válido.
+
+
+A Situação 3, conforme apresentada nas fontes, também requer a aplicação do modelo de planejamento como verificação de modelo (Planning as Model Checking) usando a estrutura conceitual do NuSMV.
+A principal característica deste cenário é o empilhamento de quatro blocos ($a, b, c, d$) com diferentes tamanhos, o que exige a estrita aplicação das restrições de estabilidade e ocupação espacial.
+A metodologia NuSMV para a Situação 3 segue as quatro etapas principais: Definição do Domínio Estático, Formalização dos Estados Inicial e Objetivo, Codificação das Transições e Verificação da Propriedade.
+1. Etapa: Definição do Domínio e Propriedades Estáticas
+Assim como na Situação 2, as propriedades físicas imutáveis dos blocos (tamanho/largura) são codificadas como constantes DEFINE no NuSMV.
+A. Atributos de Bloco (Tamanho):
+DEFINE size_a := 1;
+DEFINE size_b := 1;
+DEFINE size_c := 2;
+DEFINE size_d := 2;
+B. Variáveis Dinâmicas (VAR): As variáveis devem rastrear a posição (pos) e o status de estar livre (clear) de cada um dos quatro blocos. Conceitualmente, as variáveis de posição devem permitir valores que representem table(X) ou on(OtherBlock).
+2. Etapa: Definição dos Estados Inicial (S0) e Objetivo (G)
+Os estados inicial e objetivo devem ser traduzidos da representação visual para o formato formal pos/2, que é a base do estado dinâmico no modelo estendido.
+2.1 Estado Inicial (S0)
+A formalização do $S0$ da Situação 3, que é uma única pilha de quatro blocos, assumindo que esteja localizada no slot 0 da tabela:
+Bloco
+Posição Formal (pos/2)
+Status Vertical
+d (2)
+table(0)
+clear(d) = FALSE
+b (1)
+on(d)
+clear(b) = FALSE
+a (1)
+on(b)
+clear(a) = FALSE
+c (2)
+on(a)
+clear(c) = TRUE
+
+Implementação NuSMV (INIT): O bloco INIT deve refletir essas condições iniciais:
+INIT
+  // Posições
+  pos_d = table_0 & pos_b = on_d & pos_a = on_b & pos_c = on_a &
+  // Status clear
+  clear_c = TRUE & clear_a = FALSE & clear_b = FALSE & clear_d = FALSE;
+
+2.2 Estado Objetivo (G)
+O objetivo final (S6/S7) da Situação 3 é uma nova pilha com a ordem invertida, assumindo que ela seja construída em um novo local, como o slot 2 da mesa.
+G (S6/S7) - Formalização do Estado:
+$pos(b, table(2))$
+$pos(a, on(b))$
+$pos(c, on(a))$
+$pos(d, on(c))$
+Implementação NuSMV (DEFINE Goal):
+DEFINE goal := (pos_b = table_2 & pos_a = on_b & pos_c = on_a & pos_d = on_c);
+
+3. Etapa: Codificação das Transições e Leis Físicas (TRANS)
+As leis físicas do domínio estendido, que são o cerne do modelo, devem ser implementadas no bloco TRANS do NuSMV. Estas restrições garantem que apenas movimentos válidos (e estáveis) sejam considerados, podando o espaço de busca.
+A. Restrição de Estabilidade (Verificação 2c)
+Se a ação for move(Block, on(TargetBlock)), o NuSMV deve verificar se a largura do bloco ($W1$) é menor ou igual à largura do alvo ($W2$).
+Exemplo de Poda: No estado objetivo G, o requisito $pos(c, on(a))$ implica a ação $move(c, on(a))$.
+$size(c) = 2$ e $size(a) = 1$.
+A condição $W1 \leq W2$ se torna $2 \leq 1$.
+Esta condição falha, e o NuSMV impediria a transição para este estado instável.
+B. Restrição de Ocupação Espacial (Verificação 3b)
+Se a ação for move(Block, table(X)), a transição só é permitida se o bloco e sua largura ($W$) couberem nos slots contíguos de $X$ a $X+W-1$ e se todos esses slots estiverem livres.
+Exemplo: $move(c, table(4))$. O bloco $c$ tem largura 2. A transição só é válida se os slots 4 e 5 estiverem livres (is_free(4) e is_free(5)), garantindo que a pegada física seja respeitada.
+4. Etapa: Especificação Temporal e Geração do Plano
+O planejador usa o NuSMV para verificar se o estado objetivo $G$ é alcançável no grafo de estados definido pelas regras de transição.
+A. Definição da Propriedade (CTLSPEC): A propriedade CTL a ser verificada é a negação da alcançabilidade:
+CTLSPEC ! EF (goal)
+
+O operador EF (Existentially Exists a path to F) busca um caminho (plano) que leve ao estado goal.
+B. Geração do Plano (Trace):
+Se a propriedade ! EF (goal) for FALSA, o objetivo é alcançável, e o NuSMV produzirá uma sequência de execução (trace).
+Esta trace representa o plano de ações move/2.
+Rastreamento Conceitual do Plano (Baseado no Raciocínio de Regressão):
+A busca por trás do NuSMV revelaria os seguintes passos (exigidos para atingir submetas):
+Desmontagem: O primeiro conjunto de ações deve desmontar a pilha $D \rightarrow B \rightarrow A \rightarrow C$ de cima para baixo.
+
+
+Ação 1: $move(c, table(4))$. (Pré-condição clear(c) é satisfeita em S0. space_check(c, 4) deve ser satisfeito para slots 4 e 5).
+Ação 2: $move(a, table(1))$. (Pré-condição clear(a) deve ser satisfeita—tornada verdadeira pela Ação 1. space_check(a, 1) deve ser satisfeito para slot 1).
+Ação 3: $move(b, table(2))$. (Pré-condição clear(b) deve ser satisfeita. space_check(b, 2) deve ser satisfeito para slot 2).
+Montagem: Uma vez que os blocos b, a e c estão na mesa e d está no slot 0, a montagem para a meta $B \rightarrow A \rightarrow C \rightarrow D$ pode começar (se a meta fosse estável).
+
+
+Ação 4 (Base): $move(b, table(2))$. (Já deve estar em table(2) se a montagem for feita no lugar. Se não, esta ação é o ponto de partida).
+Ação 5: $move(a, on(b))$. (Pré-condição: size_check(a, b): $1 \leq 1$. Válido).
+Ação 6: $move(c, on(a))$. (Pré-condição: size_check(c, a): $2 \leq 1$. Inválido!).
+Resultado Esperado:
+Devido à restrição de estabilidade ($W1 \leq W2$) codificada no TRANS, o NuSMV não conseguirá alcançar o estado objetivo $G$ conforme formalizado na fonte, pois a etapa de empilhamento de $c$ (largura 2) sobre $a$ (largura 1) seria podada (rejeitada) pelo verificador de modelo.
+Para que a Situação 3 seja solúvel, o estado objetivo $G$ precisaria ser redefinido para uma configuração que respeite a regra $W_{\text{bloco}} \leq W_{\text{alvo}}$ em todas as etapas de empilhamento.
+
