@@ -53,3 +53,54 @@ LPO:
 ¬◇(on(a, c) ∧ on(b, 3) ∧ on(c, b))
 Proposição Lógica:
 CTLSPEC !EF goal;
+
+-- O código apresenta três situações de planejamento no Mundo dos Blocos em NuSMV.
+-- Cada sistema possui quatro blocos (a, b, c, d) que podem estar em mesas (t0-t6) ou sobre outros blocos.
+
+-- Situação 1 - Mundo dos Blocos com tamanhos variáveis
+-- Objetivo: mover b para cima de c
+MODULE main
+VAR
+    loc_a: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+    loc_b: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+    loc_c: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+    loc_d: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+
+DEFINE
+    clear_a := (loc_b != on_a) & (loc_c != on_a) & (loc_d != on_a);
+    clear_b := (loc_a != on_b) & (loc_c != on_b) & (loc_d != on_b);
+    clear_c := (loc_a != on_c) & (loc_b != on_c) & (loc_d != on_c);
+    clear_d := (loc_a != on_d) & (loc_b != on_d) & (loc_c != on_d);
+
+TRANS
+    -- no-op
+    (next(loc_a) = loc_a & next(loc_b) = loc_b & next(loc_c) = loc_c & next(loc_d) = loc_d)
+    |
+    -- move b on c
+    (clear_b & clear_c & next(loc_b) = on_c & next(loc_a) = loc_a & next(loc_c) = loc_c & next(loc_d) = loc_d);
+
+INIT
+    loc_a = t0 & loc_b = t2 & loc_c = t3 & loc_d = t5;
+
+SPEC
+    EF (loc_b = on_c);
+
+
+-- Situação 2 - Mundo dos Blocos com tamanhos variáveis
+-- Objetivo: formar duas torres (a sobre b e c sobre d)
+MODULE main
+VAR
+    loc_a: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+    loc_b: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+    loc_c: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+    loc_d: {t0, t1, t2, t3, t4, t5, t6, on_a, on_b, on_c, on_d};
+
+DEFINE
+    clear_a := (loc_b != on_a) & (loc_c != on_a) & (loc_d != on_a);
+    clear_b := (loc_a != on_b) & (loc_c != on_b) & (loc_d != on_b);
+    clear_c := (loc_a != on_c) & (loc_b != on_c) & (loc_d != on_c);
+    clear_d := (loc_a != on_d) & (loc_b != on_d) & (loc_c != on_d);
+
+TRANS
+    -- no-op
+    (next(loc_a) = loc_a & next(loc_b) = loc_b & next(loc_c) = loc_c & next(loc_d) = loc_d)
