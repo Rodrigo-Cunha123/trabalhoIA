@@ -1,0 +1,55 @@
+Este documento apresenta a transformação de relações binárias da Lógica de Primeira Ordem (LPO) para Proposições Lógicas, com base em um modelo NuSMV.
+O objetivo é adaptar predicados como on(x, y) para uma representação proposicional compatível com 
+ferramentas de verificação formal como o NuSMV.
+
+Relações Binárias on(x, y)
+Na LPO, temos predicados como:
+- on(a, b) → bloco a está sobre o bloco b
+- on(b, 3) → bloco b está sobre o número 3
+- on(c, b) → bloco c está sobre o bloco b
+No NuSMV, essas relações são representadas por variáveis com domínio finito:
+On_a : {b, c, 1, 2, 3, 4}; -- representa on(a, X)
+On_b : {a, c, 1, 2, 3, 4}; -- representa on(b, X)
+On_c : {a, b, 1, 2, 3, 4}; -- representa on(c, X)
+Mapeamento direto:
+| LPO | Proposição Lógica |
+|---------------|-------------------|
+| on(a, b) | on_a = b |
+| on(a, c) | on_a = c |
+| on(a, 1) | on_a = 1 |
+| on(b, a) | on_b = a |
+| on(b, 3) | on_b = 3 |
+| on(c, b) | on_c = b |
+
+Condições de Clareza (clear_x)
+Essas condições verificam se um bloco ou número está livre (sem nada em cima dele).
+LPO:
+Clear(a) ⇔ ¬on(b, a) ∧ ¬on(c, a)
+Clear(b) ⇔ ¬on(a, b) ∧ ¬on(c, b)
+Clear© ⇔ ¬on(a, c) ∧ ¬on(b, c)
+Clear(1) ⇔ ¬on(a, 1) ∧ ¬on(b, 1) ∧ ¬on(c, 1)
+Proposição Lógica:
+Cleara := (onb != a) & (on_c != a);
+Clearb := (ona != b) & (on_c != b);
+Clearc := (ona != c) & (on_b != c);
+Clear1 := (ona != 1) & (onb != 1) & (onc != 1);
+
+Objetivo (goal)
+LPO:
+Goal ⇔ on(a, c) ∧ on(b, 3) ∧ on(c, b)
+Proposição Lógica:
+Goal := (ona = c) & (onb = 3) & (on_c = b);
+
+Transições (move)
+Cada ação de movimento representa uma transição condicional.
+LPO:
+Move(a, b) ⇔ clear(a) ∧ clear(b) ∧ on(a) ≠ b ⇒ next(on(a)) = b
+Proposição Lógica:
+Move = moveab & cleara & clearb & on_a != b : b;
+Esse padrão se repete para todos os movimentos possíveis de a, b e c.
+
+Especificação Temporal (CTLSPEC)
+LPO:
+¬◇(on(a, c) ∧ on(b, 3) ∧ on(c, b))
+Proposição Lógica:
+CTLSPEC !EF goal;
